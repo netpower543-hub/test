@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>查单系统 V11 - 交互修正版</title>
+    <title>AI 开单系统 V11</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background-color: #f0f2f5; height: 100vh; overflow: hidden; }
@@ -16,9 +16,6 @@
         .msg-user { background-color: #3b82f6; color: white; border-radius: 4px; padding: 6px 12px; font-size: 12px; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2); }
         .tag-public { color: #3b82f6; font-weight: bold; margin-left: 4px; }
         
-        .btn-mode-active { background-color: #3b82f6 !important; color: white !important; border-color: #2563eb !important; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        
-        .mode-user-active { border: 2px solid #3b82f6 !important; background-color: #eff6ff !important; }
         .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .modal-overlay { background-color: rgba(15, 23, 42, 0.5); backdrop-filter: blur(2px); }
@@ -38,7 +35,7 @@
                 <button onclick="changeView('tracking')" id="tab-tracking" class="h-full px-2">追踪中 <span id="count-tracking" class="ml-1 bg-gray-200 text-gray-500 px-2 rounded-full text-[10px]">0</span></button>
                 <button onclick="changeView('closed')" id="tab-closed" class="h-full px-2">已结案 <span id="count-closed" class="ml-1 bg-gray-200 text-gray-500 px-2 rounded-full text-[10px]">0</span></button>
             </div>
-            <button onclick="mockNewOrder()" class="bg-indigo-600 text-white px-5 py-2 rounded-md text-xs font-bold shadow-lg hover:bg-indigo-700 active:scale-95 transition-all">+ 模拟新开单</button>
+            <button onclick="mockNewOrder()" class="bg-indigo-600 text-white px-5 py-2 rounded-md text-xs font-bold shadow-lg hover:bg-indigo-700">+ 模拟新开单</button>
         </div>
 
         <div class="flex-1 flex overflow-hidden bg-slate-50">
@@ -58,7 +55,7 @@
                             <span class="text-indigo-700 font-bold text-sm">📄 派单资讯</span>
                             <span id="detail-id-tag" class="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded"></span>
                         </div>
-                        <button onclick="finishOrder()" class="px-4 py-1 bg-indigo-600 text-white text-xs rounded font-bold hover:bg-indigo-700">结单</button>
+                        <button onclick="openCloseModal()" class="px-4 py-1 bg-indigo-600 text-white text-xs rounded font-bold hover:bg-indigo-700">完成结案</button>
                     </div>
                     
                     <div class="flex-1 overflow-y-auto p-4 custom-scroll bg-[#fcfcfd]" id="chat-scroller">
@@ -66,26 +63,40 @@
                     </div>
 
                     <div class="p-4 border-t bg-white">
-                        <div class="flex gap-2 mb-3">
-                            <button id="btn-mode-need" onclick="setReplyMode('need')" class="transition-all text-[10px] border border-blue-200 bg-blue-50 text-blue-600 px-3 py-1 rounded-full hover:bg-blue-100">传讯给用户</button>
-                            <button id="btn-mode-close" onclick="setReplyMode('close')" class="transition-all text-[10px] border border-indigo-200 bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full hover:bg-indigo-100">回覆并结案</button>
-                        </div>
-                        <div id="input-box" class="bg-slate-50 border border-slate-200 rounded-lg p-3 transition-all relative group focus-within:bg-white focus-within:border-indigo-300">
-                            <button id="cancel-btn" onclick="resetMode(false)" class="hidden absolute -top-2 -right-2 bg-slate-800 text-white w-5 h-5 rounded-full text-[10px] flex items-center justify-center shadow-md hover:bg-red-500 transition-colors">✕</button>
-                            
-                            <div id="mode-hint" class="text-[10px] font-bold mb-1 hidden"></div>
-                            
+                        <div id="input-box" class="bg-slate-50 border border-slate-200 rounded-lg p-3 transition-all relative">
                             <div class="flex items-start">
                                 <button onclick="openWiki()" class="mt-1 mr-3 text-slate-400 hover:text-indigo-600 text-lg transition-colors">💬</button>
+
+                                <div class="relative mr-3 mt-1">
+                                    <select id="mode-selector" onchange="updateInputMode()" class="text-[11px] border border-slate-200 rounded px-1 py-0.5 bg-white outline-none cursor-pointer text-slate-600 focus:border-indigo-400">
+                                        <option value="internal">一般留言</option>
+                                        <option value="need">传讯给AI</option>
+                                    </select>
+                                </div>
+
                                 <textarea id="msg-input" 
-                                    class="w-full text-xs outline-none bg-transparent resize-none h-16 leading-relaxed" 
-                                    placeholder="请输入文字讯息"
+                                    class="flex-1 text-xs outline-none bg-transparent resize-none h-16 leading-relaxed" 
+                                    placeholder="请输入跟进讯息..."
                                     onkeydown="handleKeyDown(event)"></textarea>
+                                
                                 <button onclick="sendMsg()" class="ml-2 bg-indigo-600 text-white p-2 rounded-lg self-end mb-1 hover:bg-indigo-700 transition-all">➤</button>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="close-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-[60]">
+        <div class="bg-white rounded-xl shadow-2xl w-[400px] overflow-hidden">
+            <div class="p-4 border-b font-bold text-gray-800">回覆并结案</div>
+            <div class="p-4">
+                <textarea id="close-comment" class="w-full border rounded-lg p-3 text-xs outline-none h-32 focus:border-indigo-400" placeholder="请输入结案回覆内容（可选）..."></textarea>
+            </div>
+            <div class="p-4 bg-slate-50 flex justify-end gap-3">
+                <button onclick="closeCloseModal()" class="px-4 py-1.5 text-xs text-slate-500 hover:bg-slate-100 rounded">取消</button>
+                <button onclick="confirmFinishOrder()" class="px-6 py-1.5 bg-indigo-600 text-white text-xs rounded font-bold hover:bg-indigo-700">确认</button>
             </div>
         </div>
     </div>
@@ -97,7 +108,7 @@
                 <button onclick="closeWiki()" class="text-gray-400">✕</button>
             </div>
             <div id="wiki-list" class="space-y-2 mb-4 max-h-56 overflow-y-auto custom-scroll"></div>
-            <button onclick="showAddWiki()" class="w-full py-2 border-2 border-dashed border-slate-200 rounded-lg text-slate-400 text-xs hover:border-indigo-300 hover:text-indigo-500">+ 新增快捷短语</button>
+            <button onclick="showAddWiki()" class="w-full py-2 border-2 border-dashed border-slate-200 rounded-lg text-slate-400 text-xs hover:border-indigo-300">+ 新增快捷短语</button>
             <div id="add-wiki-area" class="hidden mt-4 p-4 bg-slate-50 rounded-lg border">
                 <textarea id="new-wiki-text" class="w-full border p-2 text-xs rounded outline-none" rows="2"></textarea>
                 <div class="flex justify-end mt-2 gap-2">
@@ -115,13 +126,14 @@
         let selectedOrderId = null;
         let replyMode = 'internal';
 
-        // 初始化模拟数据
-        if(orders.length === 0) mockNewOrder();
+        // 初始化
+        window.onload = function() {
+            if(orders.length === 0) mockNewOrder();
+        };
 
-        // 监听 Enter 发送
         function handleKeyDown(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault(); // 防止换行
+                e.preventDefault(); 
                 sendMsg();
             }
         }
@@ -133,7 +145,7 @@
                 id, 
                 status: 'processing', 
                 time: now.toLocaleString(), 
-                logs: [{ sender: 'System', time: now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), text: '已承接了工单', isUser: false }] 
+                logs: [{ sender: 'System', time: now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), text: '已承接工单，正在核实详情...', isUser: false }] 
             });
             renderList();
             selectOrder(id);
@@ -141,13 +153,23 @@
 
         function renderList() {
             const list = document.getElementById('order-list');
+            if(!list) return;
             list.innerHTML = '';
             orders.filter(o => o.status === currentView).forEach(o => {
                 const isActive = selectedOrderId === o.id;
                 const div = document.createElement('div');
                 div.className = `order-card p-4 cursor-pointer ${isActive ? 'order-card-active' : ''}`;
                 div.onclick = () => selectOrder(o.id);
-                div.innerHTML = `<div class="flex justify-between items-start mb-2"><div class="flex items-center space-x-2"><span class="bg-indigo-100 text-indigo-600 text-[10px] font-bold px-2 py-0.5 rounded">四方进货</span><span class="font-bold text-slate-700 text-xs">${o.id}</span></div><span class="text-[10px] text-slate-400">${o.time.split(' ')[1]}</span></div><div class="text-[11px] text-slate-500">D早-杜拜-奶茶</div>`;
+                div.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="bg-indigo-100 text-indigo-600 text-[10px] font-bold px-2 py-0.5 rounded">四方进货</span>
+                            <span class="font-bold text-slate-700 text-xs">${o.id}</span>
+                        </div>
+                        <span class="text-[10px] text-slate-400">${o.time.includes(' ') ? o.time.split(' ')[1] : ''}</span>
+                    </div>
+                    <div class="text-[11px] text-slate-500">AI开单</div>
+                `;
                 list.appendChild(div);
             });
             document.getElementById('count-processing').innerText = orders.filter(o => o.status === 'processing').length;
@@ -163,8 +185,6 @@
             document.getElementById('detail-id-tag').innerText = id;
             renderLogs(order.logs);
             renderList();
-            // 切换工单时不清除输入框文字，只重置模式
-            resetMode(false); 
         }
 
         function renderLogs(logs) {
@@ -187,42 +207,13 @@
             scroller.scrollTop = scroller.scrollHeight;
         }
 
-        // 分类点击状态管理
-        function setReplyMode(mode) {
-            // 点击已选中的模式，切回内部模式 (保留文字)
-            if (replyMode === mode) {
-                resetMode(false);
-                return;
-            }
-
-            replyMode = mode;
-            document.getElementById('input-box').classList.add('mode-user-active');
-            document.getElementById('cancel-btn').classList.remove('hidden');
-            
-            // 按钮状态切换
-            document.getElementById('btn-mode-need').className = (mode === 'need' ? 'btn-mode-active ' : '') + "transition-all text-[10px] border border-blue-200 bg-blue-50 text-blue-600 px-3 py-1 rounded-full";
-            document.getElementById('btn-mode-close').className = (mode === 'close' ? 'btn-mode-active ' : '') + "transition-all text-[10px] border border-indigo-200 bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full";
-
-            const hint = document.getElementById('mode-hint');
-            hint.classList.remove('hidden');
-            hint.innerText = mode === 'need' ? "📢 当前模式：发送给用户 (保持工单)" : "📢 当前模式：发送给用户 (自动结案)";
-            hint.className = `text-[10px] font-bold mb-1 ${mode === 'need' ? 'text-blue-600' : 'text-indigo-700'}`;
-        }
-
-        // 核心修正点：由 clearInput 决定是否清空文字
-        function resetMode(clearInput = true) {
-            replyMode = 'internal';
-            document.getElementById('input-box').classList.remove('mode-user-active');
-            document.getElementById('cancel-btn').classList.add('hidden');
-            document.getElementById('mode-hint').classList.add('hidden');
-            
-            // 重置按钮样式
-            document.getElementById('btn-mode-need').className = "transition-all text-[10px] border border-blue-200 bg-blue-50 text-blue-600 px-3 py-1 rounded-full hover:bg-blue-100";
-            document.getElementById('btn-mode-close').className = "transition-all text-[10px] border border-indigo-200 bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full hover:bg-indigo-100";
-            
-            // 如果 clearInput 为真（发送后），则清空
-            if (clearInput) {
-                document.getElementById('msg-input').value = '';
+        function updateInputMode() {
+            replyMode = document.getElementById('mode-selector').value;
+            const box = document.getElementById('input-box');
+            if (replyMode === 'need') {
+                box.classList.add('border-indigo-300', 'bg-indigo-50');
+            } else {
+                box.classList.remove('border-indigo-300', 'bg-indigo-50');
             }
         }
 
@@ -237,21 +228,36 @@
                 isUser: replyMode !== 'internal' 
             });
             renderLogs(order.logs);
-            
-            if(replyMode === 'close') {
-                finishOrder();
-            } else {
-                // 发送成功后清空文字
-                resetMode(true); 
-            }
+            input.value = '';
         }
 
-        function finishOrder() {
+        function openCloseModal() {
+            if (!selectedOrderId) return;
+            document.getElementById('close-modal').classList.remove('hidden');
+            document.getElementById('close-comment').value = '';
+            document.getElementById('close-comment').focus();
+        }
+
+        function closeCloseModal() {
+            document.getElementById('close-modal').classList.add('hidden');
+        }
+
+        function confirmFinishOrder() {
+            const comment = document.getElementById('close-comment').value.trim();
             const order = orders.find(o => o.id === selectedOrderId);
-            if(order) order.status = 'closed';
+            if (comment) {
+                order.logs.push({ 
+                    sender: 'kk-yo', 
+                    time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), 
+                    text: comment, 
+                    isUser: true 
+                });
+            }
+            order.status = 'closed';
             selectedOrderId = null;
             document.getElementById('detail-content').classList.add('hidden');
             document.getElementById('empty-hint').classList.remove('hidden');
+            closeCloseModal();
             renderList();
         }
 
@@ -261,7 +267,10 @@
             document.getElementById('detail-content').classList.add('hidden');
             document.getElementById('empty-hint').classList.remove('hidden');
             renderList();
-            ['processing','tracking','closed'].forEach(x => document.getElementById('tab-'+x).className = (x===v)?'tab-active h-full px-2':'h-full px-2');
+            ['processing','tracking','closed'].forEach(x => {
+                const el = document.getElementById('tab-'+x);
+                if(el) el.className = (x===v)?'tab-active h-full px-2':'h-full px-2';
+            });
         }
 
         function openWiki() { document.getElementById('wiki-modal').classList.remove('hidden'); renderWikiList(); }

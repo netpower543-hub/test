@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>AI 开单系统 V11</title>
+    <title>查单系统 V12 - 完整分流版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background-color: #f0f2f5; height: 100vh; overflow: hidden; }
@@ -12,9 +12,10 @@
         .order-card { transition: all 0.2s; border-left: 4px solid transparent; background-color: white; border-bottom: 1px solid #f1f5f9; }
         .order-card-active { background-color: #f0f2ff !important; border-left: 4px solid #3f51b5 !important; }
         
+        /* 氣泡樣式：一般留言(黃) / 傳訊給用戶(綠) */
         .msg-internal { background-color: #fef9c3; border: 1px solid #fef08a; border-radius: 4px; padding: 6px 12px; font-size: 12px; color: #854d0e; }
-        .msg-user { background-color: #3b82f6; color: white; border-radius: 4px; padding: 6px 12px; font-size: 12px; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2); }
-        .tag-public { color: #3b82f6; font-weight: bold; margin-left: 4px; }
+        .msg-user { background-color: #e6f9ed; border: 1px solid #bbf7d0; border-radius: 4px; padding: 6px 12px; font-size: 12px; color: #166534; }
+        .tag-public { color: #22c55e; font-weight: bold; margin-left: 4px; }
         
         .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -25,17 +26,17 @@
 
     <div class="sidebar-left flex flex-col items-center py-6 space-y-6 shadow-xl z-20">
         <div class="w-9 h-9 bg-indigo-500 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-lg">K</div>
-        <div class="text-white opacity-60 text-[10px] cursor-pointer">📋 派单</div>
+        <div class="text-white opacity-60 text-[10px] cursor-pointer">📋 派單</div>
     </div>
 
     <div class="flex-1 flex flex-col h-full bg-white relative">
         <div class="h-14 border-b flex items-center px-6 justify-between bg-white z-10 shadow-sm">
             <div class="flex space-x-10 h-full items-center text-sm text-gray-400">
-                <button onclick="changeView('processing')" id="tab-processing" class="tab-active h-full px-2">处理中 <span id="count-processing" class="ml-1 bg-blue-500 text-white px-2 rounded-full text-[10px]">0</span></button>
-                <button onclick="changeView('tracking')" id="tab-tracking" class="h-full px-2">追踪中 <span id="count-tracking" class="ml-1 bg-gray-200 text-gray-500 px-2 rounded-full text-[10px]">0</span></button>
-                <button onclick="changeView('closed')" id="tab-closed" class="h-full px-2">已结案 <span id="count-closed" class="ml-1 bg-gray-200 text-gray-500 px-2 rounded-full text-[10px]">0</span></button>
+                <button onclick="changeView('processing')" id="tab-processing" class="tab-active h-full px-2">處理中 <span id="count-processing" class="ml-1 bg-blue-500 text-white px-2 rounded-full text-[10px]">0</span></button>
+                <button onclick="changeView('tracking')" id="tab-tracking" class="h-full px-2">追蹤中 <span id="count-tracking" class="ml-1 bg-gray-200 text-gray-500 px-2 rounded-full text-[10px]">0</span></button>
+                <button onclick="changeView('closed')" id="tab-closed" class="h-full px-2">已結案 <span id="count-closed" class="ml-1 bg-gray-200 text-gray-500 px-2 rounded-full text-[10px]">0</span></button>
             </div>
-            <button onclick="mockNewOrder()" class="bg-indigo-600 text-white px-5 py-2 rounded-md text-xs font-bold shadow-lg hover:bg-indigo-700">+ 模拟新开单</button>
+            <button onclick="mockNewOrder()" class="bg-indigo-600 text-white px-5 py-2 rounded-md text-xs font-bold shadow-lg hover:bg-indigo-700 active:scale-95 transition-all">+ 模擬新開單</button>
         </div>
 
         <div class="flex-1 flex overflow-hidden bg-slate-50">
@@ -46,40 +47,75 @@
             <div id="detail-panel" class="w-[38%] flex flex-col bg-white">
                 <div id="empty-hint" class="flex-1 flex flex-col items-center justify-center p-10 text-center text-slate-400">
                     <span class="text-4xl mb-4 grayscale opacity-50">📁</span>
-                    <p class="text-sm font-medium">请选择左侧订单查看详情</p>
+                    <p class="text-sm font-medium">請選擇左側訂單查看詳情</p>
                 </div>
 
                 <div id="detail-content" class="hidden flex-1 flex flex-col overflow-hidden">
                     <div class="p-4 flex justify-between items-center border-b bg-white">
                         <div class="flex items-center space-x-2">
-                            <span class="text-indigo-700 font-bold text-sm">📄 派单资讯</span>
+                            <span class="text-indigo-700 font-bold text-sm">📄 派單資訊 <span class="bg-emerald-500 text-white text-[9px] px-1 rounded ml-1">AI</span></span>
                             <span id="detail-id-tag" class="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded"></span>
                         </div>
-                        <button onclick="openCloseModal()" class="px-4 py-1 bg-indigo-600 text-white text-xs rounded font-bold hover:bg-indigo-700">完成</button>
+                        <div class="flex items-center space-x-2">
+                            <button class="px-3 py-1 bg-slate-500 text-white text-xs rounded font-bold hover:bg-slate-600">幫助</button>
+                            <button onclick="openCloseModal()" class="px-3 py-1 bg-indigo-600 text-white text-xs rounded font-bold hover:bg-indigo-700">完成</button>
+                        </div>
+                    </div>
+
+                    <div class="p-4 border-b bg-slate-50 flex flex-col relative">
+                        <div class="flex justify-between items-center mb-2">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-xs font-bold text-slate-600">附件檔案</span>
+                                <span class="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.2 rounded-sm">共 <span id="attachments-count">0</span> 筆</span>
+                            </div>
+                            
+                            <div class="relative inline-block text-left">
+                                <button onclick="toggleUploadMenu(event)" id="plus-btn" class="text-indigo-600 font-bold text-xl hover:text-indigo-800 focus:outline-none px-2">＋</button>
+                                
+                                <div id="upload-popover" class="hidden absolute right-0 mt-1 w-36 bg-white border border-slate-200 rounded-lg shadow-xl z-30 py-1 overflow-hidden">
+                                    <button onclick="triggerFileSelect('internal')" class="w-full text-left px-4 py-2 text-xs text-amber-800 hover:bg-amber-50 font-medium flex items-center gap-1.5 border-b border-slate-100">
+                                        <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span> 一般附件
+                                    </button>
+                                    <button onclick="triggerFileSelect('user')" class="w-full text-left px-4 py-2 text-xs text-emerald-800 hover:bg-emerald-50 font-medium flex items-center gap-1.5">
+                                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> 傳檔給用戶
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <input type="file" id="file-uploader" class="hidden" accept="image/*" onchange="handleFileSelect(event)">
+                        </div>
+                        <div id="attachments-zone" class="flex gap-2 overflow-x-auto custom-scroll py-1 min-h-[60px]">
+                        </div>
                     </div>
                     
-                    <div class="flex-1 overflow-y-auto p-4 custom-scroll bg-[#fcfcfd]" id="chat-scroller">
+                    <div class="flex-1 overflow-y-auto p-4 custom-scroll bg-[#fcfcfd] flex flex-col" id="chat-scroller">
+                        <div class="flex flex-col items-end mb-4 self-end max-w-full">
+                            <div class="text-[11px] text-gray-400 mb-1 text-right">上午10:57 System</div>
+                            <div class="bg-amber-50 border border-amber-200 text-amber-800 text-xs px-3 py-2 rounded shadow-sm w-fit max-w-full">
+                                已承接工單，正在核實詳情...
+                            </div>
+                        </div>
                         <div id="chat-history" class="space-y-4"></div>
                     </div>
 
                     <div class="p-4 border-t bg-white">
                         <div id="input-box" class="bg-slate-50 border border-slate-200 rounded-lg p-3 transition-all relative">
-                            <div class="flex items-start">
-                                <button onclick="openWiki()" class="mt-1 mr-3 text-slate-400 hover:text-indigo-600 text-lg transition-colors">💬</button>
-
-                                <div class="relative mr-3 mt-1">
+                            <div class="flex items-center space-x-2">
+                                <div class="relative mt-0.5">
                                     <select id="mode-selector" onchange="updateInputMode()" class="text-[11px] border border-slate-200 rounded px-1 py-0.5 bg-white outline-none cursor-pointer text-slate-600 focus:border-indigo-400">
                                         <option value="internal">一般留言</option>
-                                        <option value="need">传讯给AI</option>
+                                        <option value="user">傳訊給用戶</option>
                                     </select>
                                 </div>
+                                
+                                <button onclick="openWiki()" class="text-slate-400 hover:text-indigo-600 text-lg transition-colors">💬</button>
 
                                 <textarea id="msg-input" 
-                                    class="flex-1 text-xs outline-none bg-transparent resize-none h-16 leading-relaxed" 
-                                    placeholder="请输入跟进讯息..."
+                                    class="flex-1 text-xs outline-none bg-transparent resize-none h-10 leading-relaxed pt-2" 
+                                    placeholder="請輸入文字訊息...貼上圖片即可直接發送"
                                     onkeydown="handleKeyDown(event)"></textarea>
                                 
-                                <button onclick="sendMsg()" class="ml-2 bg-indigo-600 text-white p-2 rounded-lg self-end mb-1 hover:bg-indigo-700 transition-all">➤</button>
+                                <button onclick="sendMsg()" class="ml-2 bg-indigo-600 text-white p-2 rounded-lg self-end hover:bg-indigo-700 transition-all">➤</button>
                             </div>
                         </div>
                     </div>
@@ -90,13 +126,15 @@
 
     <div id="close-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-[60]">
         <div class="bg-white rounded-xl shadow-2xl w-[400px] overflow-hidden">
-            <div class="p-4 border-b font-bold text-gray-800">回覆并结案</div>
-            <div class="p-4">
-                <textarea id="close-comment" class="w-full border rounded-lg p-3 text-xs outline-none h-32 focus:border-indigo-400" placeholder="请输入结案回覆内容（可选）..."></textarea>
+            <div class="p-4 border-b font-bold text-gray-800 flex items-center gap-2">
+                <span>💬</span> 回覆並結案
             </div>
-            <div class="p-4 bg-slate-50 flex justify-end gap-3">
-                <button onclick="closeCloseModal()" class="px-4 py-1.5 text-xs text-slate-500 hover:bg-slate-100 rounded">取消</button>
-                <button onclick="confirmFinishOrder()" class="px-6 py-1.5 bg-indigo-600 text-white text-xs rounded font-bold hover:bg-indigo-700">确认</button>
+            <div class="p-4">
+                <textarea id="close-comment" class="w-full border rounded-lg p-3 text-xs outline-none h-32 bg-slate-50 focus:border-indigo-400 focus:bg-white" placeholder="請輸入結案回覆文字..."></textarea>
+            </div>
+            <div class="p-4 bg-slate-50 flex justify-end gap-3 border-t">
+                <button onclick="closeCloseModal()" class="px-5 py-1.5 text-xs text-slate-500 border bg-white rounded hover:bg-slate-50">取消</button>
+                <button onclick="confirmFinishOrder()" class="px-6 py-1.5 bg-indigo-600 text-white text-xs rounded font-bold hover:bg-indigo-700">送出</button>
             </div>
         </div>
     </div>
@@ -104,11 +142,11 @@
     <div id="wiki-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-50">
         <div class="bg-white rounded-xl shadow-2xl w-[450px] overflow-hidden p-5">
             <div class="font-bold text-gray-800 mb-4 flex justify-between">
-                <span>💬 快速语管理</span>
+                <span>💬 快速語管理</span>
                 <button onclick="closeWiki()" class="text-gray-400">✕</button>
             </div>
             <div id="wiki-list" class="space-y-2 mb-4 max-h-56 overflow-y-auto custom-scroll"></div>
-            <button onclick="showAddWiki()" class="w-full py-2 border-2 border-dashed border-slate-200 rounded-lg text-slate-400 text-xs hover:border-indigo-300">+ 新增快捷短语</button>
+            <button onclick="showAddWiki()" class="w-full py-2 border-2 border-dashed border-slate-200 rounded-lg text-slate-400 text-xs hover:border-indigo-300">+ 新增快捷短語</button>
             <div id="add-wiki-area" class="hidden mt-4 p-4 bg-slate-50 rounded-lg border">
                 <textarea id="new-wiki-text" class="w-full border p-2 text-xs rounded outline-none" rows="2"></textarea>
                 <div class="flex justify-end mt-2 gap-2">
@@ -121,15 +159,53 @@
 
     <script>
         let orders = [];
-        let wikiPhrases = ["请提供充值截图，谢谢。", "处理完毕，请核对。"];
+        let wikiPhrases = ["請提供充值截圖，謝謝。", "處理完畢，請核對。"];
         let currentView = 'processing';
         let selectedOrderId = null;
-        let replyMode = 'internal';
+        let replyMode = 'internal';     
+        let uploadTargetMode = 'internal'; 
 
-        // 初始化
         window.onload = function() {
             if(orders.length === 0) mockNewOrder();
+            
+            // 監聽輸入框的 Ctrl+V 貼圖事件
+            document.getElementById('msg-input').addEventListener('paste', function(e) {
+                const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+                for (let index in items) {
+                    const item = items[index];
+                    if (item.kind === 'file' && item.type.indexOf('image') !== -1) {
+                        if (!selectedOrderId) return;
+                        e.preventDefault(); // 阻止默認黏貼文字
+                        
+                        const blob = item.getAsFile();
+                        const reader = new FileReader();
+                        reader.onload = function(event) {
+                            const clipboardImgData = event.target.result;
+                            
+                            // 優化修正點：不管是「一般留言」還是「傳訊給用戶」，按 Ctrl+V 都能貼出去
+                            // 且會根據當前的 replyMode 分流對應的黃底/綠底與發送狀態
+                            handleIncomingImage(clipboardImgData, "擷取圖片.PNG", replyMode === 'user');
+                        };
+                        reader.readAsDataURL(blob);
+                    }
+                }
+            });
         };
+
+        // 獨立全域點擊監聽器
+        window.addEventListener('click', function(e) {
+            const popover = document.getElementById('upload-popover');
+            const plusBtn = document.getElementById('plus-btn');
+            if (popover && plusBtn && !popover.contains(e.target) && e.target !== plusBtn) {
+                popover.classList.add('hidden');
+            }
+        });
+
+        function toggleUploadMenu(e) {
+            e.stopPropagation();
+            const popover = document.getElementById('upload-popover');
+            if (popover) popover.classList.toggle('hidden');
+        }
 
         function handleKeyDown(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -145,7 +221,8 @@
                 id, 
                 status: 'processing', 
                 time: now.toLocaleString(), 
-                logs: [{ sender: 'System', time: now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), text: '已承接工单，正在核实详情...', isUser: false }] 
+                attachments: [], 
+                logs: [] 
             });
             renderList();
             selectOrder(id);
@@ -163,12 +240,12 @@
                 div.innerHTML = `
                     <div class="flex justify-between items-start mb-2">
                         <div class="flex items-center space-x-2">
-                            <span class="bg-indigo-100 text-indigo-600 text-[10px] font-bold px-2 py-0.5 rounded">四方进货</span>
+                            <span class="bg-indigo-100 text-indigo-600 text-[10px] font-bold px-2 py-0.5 rounded">四方進貨</span>
                             <span class="font-bold text-slate-700 text-xs">${o.id}</span>
                         </div>
                         <span class="text-[10px] text-slate-400">${o.time.includes(' ') ? o.time.split(' ')[1] : ''}</span>
                     </div>
-                    <div class="text-[11px] text-slate-500">AI开单</div>
+                    <div class="text-[11px] text-slate-500">AI開單</div>
                 `;
                 list.appendChild(div);
             });
@@ -180,11 +257,37 @@
         function selectOrder(id) {
             selectedOrderId = id;
             const order = orders.find(o => o.id === id);
-            document.getElementById('empty-hint').classList.add('hidden');
-            document.getElementById('detail-content').classList.remove('hidden');
+            document.getElementById('empty-hint').className = 'hidden';
+            document.getElementById('detail-content').className = 'flex-1 flex flex-col overflow-hidden';
             document.getElementById('detail-id-tag').innerText = id;
+            
+            renderAttachments(order);
             renderLogs(order.logs);
             renderList();
+        }
+
+        function renderAttachments(order) {
+            const zone = document.getElementById('attachments-zone');
+            const countText = document.getElementById('attachments-count');
+            zone.innerHTML = '';
+            countText.innerText = order.attachments.length;
+            
+            if(order.attachments.length === 0) {
+                zone.innerHTML = `<span class="text-[11px] text-slate-400 self-center">無可用附件檔案</span>`;
+                return;
+            }
+            
+            order.attachments.forEach(fileObj => {
+                const img = document.createElement('img');
+                img.src = fileObj.src;
+                const borderClass = fileObj.isUser ? 'border-emerald-400 ring-2 ring-emerald-50' : 'border-amber-400 ring-2 ring-amber-50';
+                img.className = `w-12 h-12 rounded object-cover border-2 shadow-sm cursor-zoom-in ${borderClass}`;
+                img.onclick = () => {
+                    const w = window.open();
+                    w.document.write(`<img src="${fileObj.src}" style="max-width:100%;"/>`);
+                };
+                zone.appendChild(img);
+            });
         }
 
         function renderLogs(logs) {
@@ -192,12 +295,13 @@
             history.innerHTML = '';
             logs.forEach(l => {
                 const div = document.createElement('div');
-                div.className = "flex flex-col items-end";
+                div.className = "flex flex-col items-end w-full mb-2";
+
                 div.innerHTML = `
                     <div class="flex items-center mb-1 text-[11px] text-gray-500">
                         <span>${l.time}</span>
                         <span class="ml-1">${l.sender}</span>
-                        ${l.isUser ? '<span class="tag-public">[发给用户]</span>' : ''}
+                        ${l.isUser ? '<span class="tag-public">[發給用戶]</span>' : ''}
                     </div>
                     <div class="${l.isUser ? 'msg-user' : 'msg-internal'} shadow-sm">${l.text}</div>
                 `;
@@ -209,26 +313,57 @@
 
         function updateInputMode() {
             replyMode = document.getElementById('mode-selector').value;
-            const box = document.getElementById('input-box');
-            if (replyMode === 'need') {
-                box.classList.add('border-indigo-300', 'bg-indigo-50');
-            } else {
-                box.classList.remove('border-indigo-300', 'bg-indigo-50');
-            }
         }
 
         function sendMsg() {
             const input = document.getElementById('msg-input');
             if(!input.value.trim() || !selectedOrderId) return;
             const order = orders.find(o => o.id === selectedOrderId);
+            
             order.logs.push({ 
                 sender: 'kk-yo', 
                 time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), 
                 text: input.value.trim(), 
-                isUser: replyMode !== 'internal' 
+                isUser: replyMode === 'user' 
             });
             renderLogs(order.logs);
             input.value = '';
+        }
+
+        function triggerFileSelect(targetMode) {
+            uploadTargetMode = targetMode;
+            document.getElementById('file-uploader').click();
+            document.getElementById('upload-popover').classList.add('hidden');
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file || !selectedOrderId) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                handleIncomingImage(e.target.result, file.name, uploadTargetMode === 'user');
+            };
+            reader.readAsDataURL(file);
+            event.target.value = ''; 
+        }
+
+        function handleIncomingImage(base64Data, filename, isSentToUser) {
+            const order = orders.find(o => o.id === selectedOrderId);
+            order.attachments.push({
+                src: base64Data,
+                isUser: isSentToUser
+            });
+            renderAttachments(order);
+            
+            const fileIndex = order.attachments.length;
+            order.logs.push({
+                sender: 'kk-yo',
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                text: `已新增了附加檔案 ${filename}(${fileIndex})`, 
+                isUser: isSentToUser  
+            });
+            renderLogs(order.logs);
         }
 
         function openCloseModal() {
@@ -245,6 +380,7 @@
         function confirmFinishOrder() {
             const comment = document.getElementById('close-comment').value.trim();
             const order = orders.find(o => o.id === selectedOrderId);
+            
             if (comment) {
                 order.logs.push({ 
                     sender: 'kk-yo', 
@@ -253,10 +389,11 @@
                     isUser: true 
                 });
             }
+            
             order.status = 'closed';
             selectedOrderId = null;
-            document.getElementById('detail-content').classList.add('hidden');
-            document.getElementById('empty-hint').classList.remove('hidden');
+            document.getElementById('detail-content').className = 'hidden';
+            document.getElementById('empty-hint').className = 'flex-1 flex flex-col items-center justify-center p-10 text-center text-slate-400';
             closeCloseModal();
             renderList();
         }
@@ -264,8 +401,8 @@
         function changeView(v) {
             currentView = v;
             selectedOrderId = null;
-            document.getElementById('detail-content').classList.add('hidden');
-            document.getElementById('empty-hint').classList.remove('hidden');
+            document.getElementById('detail-content').className = 'hidden';
+            document.getElementById('empty-hint').className = 'flex-1 flex flex-col items-center justify-center p-10 text-center text-slate-400';
             renderList();
             ['processing','tracking','closed'].forEach(x => {
                 const el = document.getElementById('tab-'+x);

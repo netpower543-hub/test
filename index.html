@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>查单系统 V12 - 完整分流版</title>
+    <title>查单系统 V12 - 完整修复稳定版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background-color: #f0f2f5; height: 100vh; overflow: hidden; }
@@ -12,9 +12,11 @@
         .order-card { transition: all 0.2s; border-left: 4px solid transparent; background-color: white; border-bottom: 1px solid #f1f5f9; }
         .order-card-active { background-color: #f0f2ff !important; border-left: 4px solid #3f51b5 !important; }
         
-        /* 氣泡樣式：一般留言(黃) / 傳訊給用戶(綠) */
+        /* 氣泡樣式：一般留言(黃) / 傳訊給用戶(綠) / 未傳送(紅) */
         .msg-internal { background-color: #fef9c3; border: 1px solid #fef08a; border-radius: 4px; padding: 6px 12px; font-size: 12px; color: #854d0e; }
         .msg-user { background-color: #e6f9ed; border: 1px solid #bbf7d0; border-radius: 4px; padding: 6px 12px; font-size: 12px; color: #166534; }
+        .msg-failed { background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; padding: 6px 12px; font-size: 12px; color: #991b1b; }
+        
         .tag-public { color: #22c55e; font-weight: bold; margin-left: 4px; }
         
         .custom-scroll::-webkit-scrollbar { width: 4px; }
@@ -69,17 +71,13 @@
                                 <span class="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.2 rounded-sm">共 <span id="attachments-count">0</span> 筆</span>
                             </div>
                             
-                            <div class="relative inline-block text-left">
-                                <button onclick="toggleUploadMenu(event)" id="plus-btn" class="text-indigo-600 font-bold text-xl hover:text-indigo-800 focus:outline-none px-2">＋</button>
-                                
-                                <div id="upload-popover" class="hidden absolute right-0 mt-1 w-36 bg-white border border-slate-200 rounded-lg shadow-xl z-30 py-1 overflow-hidden">
-                                    <button onclick="triggerFileSelect('internal')" class="w-full text-left px-4 py-2 text-xs text-amber-800 hover:bg-amber-50 font-medium flex items-center gap-1.5 border-b border-slate-100">
-                                        <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span> 一般附件
-                                    </button>
-                                    <button onclick="triggerFileSelect('user')" class="w-full text-left px-4 py-2 text-xs text-emerald-800 hover:bg-emerald-50 font-medium flex items-center gap-1.5">
-                                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> 傳檔給用戶
-                                    </button>
-                                </div>
+                            <div class="flex items-center space-x-2">
+                                <button onclick="triggerFileSelect('internal')" class="px-2 py-1 text-[11px] font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 rounded border border-amber-300 transition-colors">
+                                    + 傳檔給客服
+                                </button>
+                                <button onclick="triggerFileSelect('user')" class="px-2 py-1 text-[11px] font-medium text-emerald-800 bg-emerald-100 hover:bg-emerald-200 rounded border border-emerald-300 transition-colors">
+                                    + 傳檔給用戶
+                                </button>
                             </div>
                             
                             <input type="file" id="file-uploader" class="hidden" accept="image/*" onchange="handleFileSelect(event)">
@@ -168,44 +166,24 @@
         window.onload = function() {
             if(orders.length === 0) mockNewOrder();
             
-            // 監聽輸入框的 Ctrl+V 貼圖事件
             document.getElementById('msg-input').addEventListener('paste', function(e) {
                 const items = (e.clipboardData || e.originalEvent.clipboardData).items;
                 for (let index in items) {
                     const item = items[index];
                     if (item.kind === 'file' && item.type.indexOf('image') !== -1) {
                         if (!selectedOrderId) return;
-                        e.preventDefault(); // 阻止默認黏貼文字
+                        e.preventDefault();
                         
                         const blob = item.getAsFile();
                         const reader = new FileReader();
                         reader.onload = function(event) {
-                            const clipboardImgData = event.target.result;
-                            
-                            // 優化修正點：不管是「一般留言」還是「傳訊給用戶」，按 Ctrl+V 都能貼出去
-                            // 且會根據當前的 replyMode 分流對應的黃底/綠底與發送狀態
-                            handleIncomingImage(clipboardImgData, "擷取圖片.PNG", replyMode === 'user');
+                            handleIncomingImage(event.target.result, "截取图片.PNG", replyMode === 'user');
                         };
                         reader.readAsDataURL(blob);
                     }
                 }
             });
         };
-
-        // 獨立全域點擊監聽器
-        window.addEventListener('click', function(e) {
-            const popover = document.getElementById('upload-popover');
-            const plusBtn = document.getElementById('plus-btn');
-            if (popover && plusBtn && !popover.contains(e.target) && e.target !== plusBtn) {
-                popover.classList.add('hidden');
-            }
-        });
-
-        function toggleUploadMenu(e) {
-            e.stopPropagation();
-            const popover = document.getElementById('upload-popover');
-            if (popover) popover.classList.toggle('hidden');
-        }
 
         function handleKeyDown(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -297,13 +275,31 @@
                 const div = document.createElement('div');
                 div.className = "flex flex-col items-end w-full mb-2";
 
+                let statusHtml = '';
+                let bubbleClass = l.isUser ? 'msg-user' : 'msg-internal';
+
+                // 核心修复点：使用正确的变量 l.status 并且将状态成功标签前置固定
+                if (l.isUser) {
+                    if (l.status === 'sending') {
+                        statusHtml = `<span class="text-[10px] text-slate-400 mr-2 animate-pulse">🕒 傳送中...</span>`;
+                    } else if (l.status === 'success') {
+                        statusHtml = `<span class="text-[10px] text-slate-400 mr-2">✓ 已傳送</span>`;
+                    } else if (l.status === 'failed') {
+                        statusHtml = `<span class="text-[10px] text-rose-500 font-bold mr-2 animate-pulse">⚠️ 未傳送</span>`;
+                        bubbleClass = 'msg-failed'; 
+                    }
+                } else {
+                    statusHtml = ''; // 一般留言完全不显示任何状态，保持純淨
+                }
+
                 div.innerHTML = `
                     <div class="flex items-center mb-1 text-[11px] text-gray-500">
+                        ${statusHtml}
                         <span>${l.time}</span>
                         <span class="ml-1">${l.sender}</span>
                         ${l.isUser ? '<span class="tag-public">[發給用戶]</span>' : ''}
                     </div>
-                    <div class="${l.isUser ? 'msg-user' : 'msg-internal'} shadow-sm">${l.text}</div>
+                    <div class="${bubbleClass} shadow-sm">${l.text}</div>
                 `;
                 history.appendChild(div);
             });
@@ -319,21 +315,26 @@
             const input = document.getElementById('msg-input');
             if(!input.value.trim() || !selectedOrderId) return;
             const order = orders.find(o => o.id === selectedOrderId);
+            const isUserMode = replyMode === 'user';
             
-            order.logs.push({ 
+            const newLog = { 
                 sender: 'kk-yo', 
                 time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), 
                 text: input.value.trim(), 
-                isUser: replyMode === 'user' 
-            });
+                isUser: isUserMode,
+                status: isUserMode ? 'sending' : 'success'
+            };
+            
+            order.logs.push(newLog);
             renderLogs(order.logs);
             input.value = '';
+
+            if (isUserMode) simulateNetwork(newLog);
         }
 
         function triggerFileSelect(targetMode) {
             uploadTargetMode = targetMode;
             document.getElementById('file-uploader').click();
-            document.getElementById('upload-popover').classList.add('hidden');
         }
 
         function handleFileSelect(event) {
@@ -357,13 +358,32 @@
             renderAttachments(order);
             
             const fileIndex = order.attachments.length;
-            order.logs.push({
+            const newLog = {
                 sender: 'kk-yo',
                 time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
                 text: `已新增了附加檔案 ${filename}(${fileIndex})`, 
-                isUser: isSentToUser  
-            });
+                isUser: isSentToUser,
+                status: isSentToUser ? 'sending' : 'success'
+            };
+
+            order.logs.push(newLog);
             renderLogs(order.logs);
+
+            if (isSentToUser) simulateNetwork(newLog);
+        }
+
+        function simulateNetwork(logItem) {
+            setTimeout(() => {
+                if (Math.random() < 0.15) {
+                    logItem.status = 'failed';
+                } else {
+                    logItem.status = 'success';
+                }
+                if (selectedOrderId) {
+                    const order = orders.find(o => o.id === selectedOrderId);
+                    renderLogs(order.logs);
+                }
+            }, 1000);
         }
 
         function openCloseModal() {
@@ -386,7 +406,8 @@
                     sender: 'kk-yo', 
                     time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), 
                     text: comment, 
-                    isUser: true 
+                    isUser: true,
+                    status: 'success'
                 });
             }
             
